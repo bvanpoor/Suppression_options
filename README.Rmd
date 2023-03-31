@@ -1,0 +1,14 @@
+---
+title: "Readme.md"
+author: "Brett van Poorten"
+date: "2023-03-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## README
+
+Repository for Cultus Lake smallmouth bass suppression options - estimation and data
