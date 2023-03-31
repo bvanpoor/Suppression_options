@@ -1,0 +1,55 @@
+model{
+
+  # NOTE: I DECIDED NOT TO FINISH THIS NOW - I NEED A FAST LIKELIHOOD MODEL THAT I CAN 
+  #  IMPLEMENT MULTIPLE TIMES TO DO SENSITIVITY ANALYSIS AND REPEATED ESTIMATES TO 
+  #  EVALUATE INFORMATION IN DIFFERENT SAMPLING STRATEGIES
+  # COME BACK TO THIS LATER
+
+  ####################
+  ###### Priors ######
+  ####################
+  R0 ~ dunif( 100, 10000 )
+  reck ~ dunif( 1, 50 )
+  lM ~ dnorm( log(0.4), pow(0.4,-2) )
+  sela ~ dunif( 1,50 )
+  selb ~ dunif( 1,500 )
+  for( a in AR:A ){
+    linitNF[a] ~ dunif( 0,8 )
+    linitNM[a] ~ dunif( 0,8 )
+  }
+  
+  M <- exp( lM )                      # natural mortality rate
+  for( a in AR:A ){
+    initNF[a] <- exp( linitNF[a] )    # initial abundance of females
+    initNM[a] <- exp( linitNM[a] )    # init abundance of males 
+  }
+  
+  #####################
+  ####### Model #######
+  #####################
+  
+  # initialize
+  Ages <- AR:A
+  for( a in AR:A ){
+    Lt[a]   <- Linf * ( 1 - exp( - K * a ))       # length-at-age
+    Wt[a]   <- 1E-5 * Lt[a] ^ 3                   # weight-at-age
+    Fec[a]  <- Wt[a] * EggMass                    # fecundity-at-age
+    Mat[a]  <- 1/(1+exp(-(a-Mat50)/MatSig))       # maturity probability
+    sel[a]  <- 1/(1+exp(-(Lt[a]-selb)/sela))      # selectivity to fishery
+  }
+  for( a in AR:(A-1)){
+    lx[a]   <- exp(-M*(a-AR))                     # survivorship to age
+  }
+  lx[A]     <- exp(-M*(A-AR)) / ( 1 - exp( -M ))  # plus-group
+  phi0      <- sum( lx * Mat * Fec )              # expected eggs per recruit
+  recA      <- reck / phi0                        # Ricker a parameter (maximum survival)
+  recB      <- log( reck )/( R0 * phi0 )          # Ricker b parameter (density-dependent parameter)
+  
+  # time series
+  
+  
+  ################
+  ## Likelihood ##
+  ################
+  
+}

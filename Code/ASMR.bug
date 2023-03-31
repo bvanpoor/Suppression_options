@@ -1,0 +1,109 @@
+
+    model{
+    # Priors
+    M ~ dlnorm(-1.6,pow(0.8,-2))      # natural mortality rate
+    for( a in AR:(A-1) ){
+      lNT[a] ~ dunif(0,10)              # terminal abundance by age
+      NT[a] <- exp( lNT[a] )
+    } #t
+    for( a in AR:A ){
+      sel[a] ~ dbeta(1,1)         # age-specific selectivity
+    } #a
+    for( i in 1:nF ){
+      lFunobs[i] ~ dunif(-10,1)         # unobserved fishing mortality in some months
+    } #t
+    for( t in 1:nT ){
+      Funobs[t] <- exp(lFunobs[iF[t]])       # fishing mortality put in appropriate months
+    } #t
+
+    # Model
+    for( a in AR:A ){
+      Lt[a] <- Linf*(1-exp(-K*a))       # length at age
+    } #a
+
+    # Forecast marked abundance
+    for( a in AR:A ){
+      Mhat[1,a] <- 0                    # initial abundance of marked fish (=0)
+    } #a
+    Mhat[nny,1] <- 0                    # initial marked abundance in January, year-2
+
+    # estimated marked abundance in first calendar year
+    for( t in 2:(nny-1) ){              # marked abundance progressing within an age across months 
+                                        #   in first year
+      for( a in AR:A ){
+        Mhat[t,a] <- ( Mhat[t-1,a] + MarkedMort[t-1,a] - Marked[t-1,a] ) * 
+                        exp( -M/12 - Funobs[t-1]*sel[a] )
+      } #a
+    } #t
+    # estimated marked abundance in first month of new year
+    for( a in (AR+1):A ){
+      Mhat[nny,a] <- ( Mhat[nny-1,a-1] + MarkedMort[nny-1,a-1] - Marked[nny-1,a-1] ) *
+                        exp( -M/12 - Funobs[nny-1]*sel[a-1] )
+    } #a
+    # estimated marked abundance in second calendar year
+    for( t in (nny+1):nT ){
+      for( a in AR:A ){
+        Mhat[t,a] <- ( Mhat[t-1,a] + MarkedMort[t-1,a] - Marked[t-1,a] ) *
+                        exp( -M/12 - Funobs[t-1]*sel[a] )
+      } #a
+    } #t
+    
+    # Hindcast unmarked abundance
+    for(a in AR:(A-1)){
+      Uhat[nT,a] <- NT[a]               # terminal year unmarked fish
+    } #a
+    for(t in 1:nT){
+      Uhat[t,A] <- 0                    # terminal age unmarked fish
+    } #t
+    # estimated marked abundance in first calendar year
+    for(t in 1:Tback[nny]){                # loops only increment up, so use vectors Aback and Tback
+      for(a in AR:(A-1)){                   # to result in a backwards progression
+        Uhat[Tback[t],Aback[a]] <- Uhat[Tback[t]+1,Aback[a]]/
+          exp(-M/12-Funobs[Tback[t]]*sel[Aback[a]]) + 
+          Marked[Tback[t],Aback[a]] + UnmarkedMort[Tback[t],Aback[a]]   # unmarked abundance
+      } #a
+    } #t
+    # estimated marked abundance in first month of second calendar year
+    for(a in AR:(A-1)){
+      Uhat[Tback[Tback[nny-1]],Aback[a]] <- Uhat[Tback[Tback[nny-1]]+1,Aback[a]+1]/
+        exp(-M/12-Funobs[Tback[Tback[nny-1]]]*sel[Aback[a]]) + 
+        Marked[Tback[Tback[nny-1]],Aback[a]] + UnmarkedMort[Tback[Tback[nny-1]],Aback[a]]   # unmarked abundance
+    } #a
+    # estimated marked abundance in second calendar year
+    for(t in Tback[nny-2]:(nT-1)){
+      for(a in AR:(A-1)){
+        Uhat[Tback[t],Aback[a]] <- Uhat[Tback[t]+1,Aback[a]]/
+          exp(-M/12-Funobs[Tback[t]]*sel[Aback[a]]) + 
+          Marked[Tback[t],Aback[a]] + UnmarkedMort[Tback[t],Aback[a]]   # unmarked abundance
+      } #a
+    } #t
+  
+    # MLE of exploitation rate
+    for(t in 1:nT){
+      V[t] <- sum( sel * (Uhat[t,]+Mhat[t,]))
+      Fobs[t] <- -log( 1 - csum[t]/V[t])  # observed exploitation rate 
+    } #t
+
+    # Predict catches by gear
+    for(t in 1:nT){
+      for(a in AR:A){
+        Z[t,a] <- M + (Fobs[t] + Funobs[t])*sel[a]        # total mortality
+        # predicted unmarked catch
+        uchat[t,a] <- Uhat[t,a] * Fobs[t]*sel[a]/Z[t,a] * (1-exp(-Z[t,a]))
+        # predicted marked catch
+        mchat[t,a] <- Uhat[t,a] * Fobs[t]*sel[a]/Z[t,a] * (1-exp(-Z[t,a]))   
+      } #a
+    } #t
+
+    # Likelihood
+    Nhat <- Uhat + Mhat
+    for(t in 1:nT){
+      for(a in AR:A){
+        mobs[t,a] ~ dbin( Mhat[t,a]/(Uhat[t,a]+Mhat[t,a]),cobs[t,a])
+        #uobs[s,a] ~ dpois(uchat[g,s,a]+1e-10)
+        #mobs[s,a] ~ dpois(mchat[g,s,a]+1E-10)
+      } #a
+    } #t
+
+  } #Model
+    
